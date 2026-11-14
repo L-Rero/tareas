@@ -19,7 +19,7 @@ const busyBtn = (id, on, label) => { const b = document.getElementById(id); if (
 
 async function saveDev() { await IDB.set('device', DEV.d); }
 async function startApp() {
-  document.body.classList.remove('setup'); $('#setup').hidden = true; $('#app').hidden = false;
+  document.body.classList.remove('setup'); const su = $('#setup'); su.hidden = true; su.innerHTML = ''; $('#app').hidden = false;
   await loadState(); APP.start(); SYNC.schedule(200);
 }
 
