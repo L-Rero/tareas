@@ -1,7 +1,7 @@
 /* Interfaz de Tareas de casa: mismas pantallas que la app nativa (TareasCasa/Vistas). */
 const M = () => document.getElementById('m');
 let TAB = 'resumen', MES = Fechas.mes(Fechas.hoy()), VER_TODO = false;
-let SEL = null, FECHA = '', BUSQ = '', ULT = null, ULT_T = null, EDIT_H = false, LIM_H = 30, DIAS = {};
+let SEL = new Set(), FECHA = '', BUSQ = '', ULT = null, ULT_T = null, EDIT_H = false, LIM_H = 30, DIAS = {};
 const GASTOS_URL = 'https://l-rero.github.io/gastos/';
 
 /* Conexión con las piezas compartidas (sync.js y setup.js) */
@@ -97,9 +97,10 @@ function vRegistrar() {
   if (!p) return `<div class="empty big"><div style="font-size:44px">👥</div><b>Todavía no hay nadie</b><p>Añade a las personas de la casa para empezar a registrar tareas.</p><button class="bt" onclick="editorPersona()">Añadir persona</button></div>`;
   if (!FECHA || FECHA > hoy) FECHA = hoy;
   const ops = opcionesRegistrar(S.tasks, S.log, p, FECHA, BUSQ), away = awayPct(p.home);
-  if (SEL && !ops.some(o => o.tarea.id === SEL)) SEL = null;
-  let h = seccion('', `<div class="row people">${personas().map(x => `<button class="pp${x.id === p.id ? ' on' : ''}" style="--c:${colorValido(x.color)}" data-id="${esc(x.id)}" onclick="yo.set(this.dataset.id);SEL=null;render()">${avatar(x, 48)}<small>${esc(x.name)}</small></button>`).join('')}<button class="pp" onclick="editorPersona()"><span class="av add">+</span><small>Añadir</small></button></div>
-    <div class="row"><span class="tx">Fecha</span><input type="date" id="rf" value="${FECHA}" max="${hoy}" onchange="FECHA=this.value>'${hoy}'?'${hoy}':this.value||'${hoy}';SEL=null;render()">${FECHA !== hoy ? `<button class="bt g sm" onclick="FECHA='${hoy}';render()">Hoy</button>` : ''}</div>`);
+  const validas = new Set(opcionesRegistrar(S.tasks, S.log, p, FECHA, '').map(o => o.tarea.id));
+  SEL.forEach(id => { if (!validas.has(id)) SEL.delete(id); });
+  let h = seccion('', `<div class="row people">${personas().map(x => `<button class="pp${x.id === p.id ? ' on' : ''}" style="--c:${colorValido(x.color)}" data-id="${esc(x.id)}" onclick="yo.set(this.dataset.id);render()">${avatar(x, 48)}<small>${esc(x.name)}</small></button>`).join('')}<button class="pp" onclick="editorPersona()"><span class="av add">+</span><small>Añadir</small></button></div>
+    <div class="row"><span class="tx">Fecha</span><input type="date" id="rf" value="${FECHA}" max="${hoy}" onchange="FECHA=this.value>'${hoy}'?'${hoy}':this.value||'${hoy}';render()">${FECHA !== hoy ? `<button class="bt g sm" onclick="FECHA='${hoy}';render()">Hoy</button>` : ''}</div>`);
   h += `<label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Buscar tarea" value="${esc(BUSQ)}" oninput="BUSQ=this.value;listaRegistrar()"></label>`;
   h += `<div id="lreg">${listaRegistrarHtml(p, ops, away)}</div>`;
   const todos = historial(S.log), dias = agruparPorDia(todos.slice(0, LIM_H));
@@ -110,35 +111,46 @@ function vRegistrar() {
   return h + '<div style="height:70px"></div>';
 }
 function listaRegistrarHtml(p, ops, away) {
-  const cuerpo = ops.length ? ops.map(o => { const on = o.tarea.id === SEL, c = colorValido(p.color); return `<button class="row opt${on ? ' on' : ''}" style="--c:${c}" data-id="${esc(o.tarea.id)}" onclick="SEL=SEL===this.dataset.id?null:this.dataset.id;listaRegistrar();barraInferior()"><span class="emo">${esc(o.tarea.emoji)}</span><span class="tx"><b>${esc(o.tarea.name)}</b><small class="${o.valor.tocaYa && !o.tarea.once ? 'naranja' : ''}">${esc(estadoOpcion(o))}</small></span>${pastilla(o.puntos, c)}<span class="chk">${on ? '●' : '○'}</span></button>`; }).join('')
+  const cuerpo = ops.length ? ops.map(o => { const on = SEL.has(o.tarea.id), c = colorValido(p.color); return `<button class="row opt${on ? ' on' : ''}" style="--c:${c}" data-id="${esc(o.tarea.id)}" onclick="elegirTarea(this.dataset.id)"><span class="emo">${esc(o.tarea.emoji)}</span><span class="tx"><b>${esc(o.tarea.name)}</b><small class="${o.valor.tocaYa && !o.tarea.once ? 'naranja' : ''}">${esc(estadoOpcion(o))}</small></span>${pastilla(o.puntos, c)}<span class="chk">${on ? '✓' : ''}</span></button>`; }).join('')
     : `<div class="empty">${BUSQ ? 'Sin resultados para «' + esc(BUSQ) + '».' : 'No hay tareas pendientes.'}</div>`;
-  return seccion('Tareas para ' + esc(p.name), cuerpo, away > 0 ? `Incluye +${away} % por días fuera de casa.` : '');
+  const pie = [ops.length ? 'Puedes marcar varias tareas a la vez.' : '', away > 0 ? `Incluye +${away} % por días fuera de casa.` : ''].filter(Boolean).join(' ');
+  return seccion('Tareas para ' + esc(p.name), cuerpo, pie);
 }
+function elegirTarea(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id); listaRegistrar(); barraInferior(); }
 function listaRegistrar() { const p = personaActual(), e = $('#lreg'); if (!p || !e) return; e.innerHTML = listaRegistrarHtml(p, opcionesRegistrar(S.tasks, S.log, p, FECHA, BUSQ), awayPct(p.home)); }
 function barraInferior() {
   const b = $('#bbar'); if (!b) return;
   const p = personaActual();
-  if (TAB === 'registrar' && p && SEL) {
-    const o = opcionesRegistrar(S.tasks, S.log, p, FECHA, '').find(x => x.tarea.id === SEL);
-    if (o) { const c = colorValido(p.color); b.innerHTML = `<button class="bt big" style="background:${c};color:${textoSobre(c)}" onclick="confirmarRegistro()">Confirmar +${o.puntos} pts</button>`; b.hidden = false; return; }
+  if (TAB === 'registrar' && p && SEL.size) {
+    const os = opcionesRegistrar(S.tasks, S.log, p, FECHA, '').filter(x => SEL.has(x.tarea.id));
+    if (os.length) {
+      const c = colorValido(p.color), pts = os.reduce((a, o) => a + o.puntos, 0);
+      b.innerHTML = `<div class="bbrow">${os.length > 1 ? `<button class="bt g big quitar" onclick="SEL.clear();listaRegistrar();barraInferior()" aria-label="Quitar la selección">✕</button>` : ''}<button class="bt big" style="background:${c};color:${textoSobre(c)}" onclick="confirmarRegistro()">${os.length > 1 ? `Confirmar ${os.length} tareas · +${pts} pts` : `Confirmar +${pts} pts`}</button></div>`;
+      b.hidden = false; return;
+    }
   }
-  if (TAB === 'registrar' && ULT) { b.innerHTML = `<div class="undo"><span>✅ ${esc(ULT.emoji)} ${esc(ULT.taskName)} · +${ULT.points} pts</span><button class="lnk b" onclick="deshacerUltimo()">Deshacer</button></div>`; b.hidden = false; return; }
+  if (TAB === 'registrar' && ULT) {
+    const pts = ULT.reduce((a, r) => a + r.points, 0), txt = ULT.length > 1 ? `${ULT.length} tareas` : `${esc(ULT[0].emoji)} ${esc(ULT[0].taskName)}`;
+    b.innerHTML = `<div class="undo"><span>✅ ${txt} · +${pts} pts</span><button class="lnk b" onclick="deshacerUltimo()">Deshacer</button></div>`; b.hidden = false; return;
+  }
+  if (TAB === 'perfiles') { const pid = Object.keys(DIAS).find(id => persona(id)); if (pid) { barraDias(b, persona(pid)); return; } }
   b.hidden = true; b.innerHTML = '';
 }
 async function confirmarRegistro() {
-  const p = personaActual(), t = S.tasks.find(x => x.id === SEL), hoy = Fechas.hoy();
-  if (!p || !t || FECHA > hoy || puntualHecha(t, S.log)) return;
+  const p = personaActual(), hoy = Fechas.hoy();
+  const ts = opcionesRegistrar(S.tasks, S.log, p || { home: [] }, FECHA, '').map(o => o.tarea).filter(t => SEL.has(t.id) && !puntualHecha(t, S.log));
+  if (!p || !ts.length || FECHA > hoy) return;
   const antes = pendientes(S.rewards, personas(), S.log, S.claims);
-  const r = nuevoRegistro(t, p, FECHA, S.log); S.log.push(r); save();
+  const rs = ts.map(t => nuevoRegistro(t, p, FECHA, S.log)); S.log.push(...rs); save();
   const nuevos = nuevosPremios(antes, pendientes(S.rewards, personas(), S.log, S.claims));
-  SEL = null; ULT = r; clearTimeout(ULT_T); ULT_T = setTimeout(() => { if (ULT && ULT.id === r.id) { ULT = null; barraInferior(); } }, 6000);
+  SEL.clear(); ULT = rs; clearTimeout(ULT_T); ULT_T = setTimeout(() => { if (ULT === rs) { ULT = null; barraInferior(); } }, 6000);
   render(); confeti();
   if (nuevos.length) avisar('🎉 ¡Premio conseguido!', nuevos.map(g => `${esc(g.personaNombre)} ha ganado «${esc(g.recompensa.emoji)} ${esc(g.recompensa.name)}» (${g.threshold} pts).`).join('<br>') + '<br><br>Lo tienes en Premios para reclamarlo.');
 }
-function deshacerUltimo() { if (!ULT) return; delItem('log', ULT.id); ULT = null; clearTimeout(ULT_T); render(); }
+function deshacerUltimo() { if (!ULT) return; const ids = new Set(ULT.map(r => r.id)); S.log = S.log.filter(e => !ids.has(e.id)); save(); ULT = null; clearTimeout(ULT_T); render(); }
 async function borrarRegistro(id) {
   const r = S.log.find(x => x.id === id); if (!r) return;
-  if (await confirmar('¿Borrar este registro?', `${esc(r.emoji)} ${esc(r.taskName)}: se restarán ${r.points} puntos a ${esc(r.personName)}.`, 'Borrar', 1)) { delItem('log', id); if (ULT && ULT.id === id) ULT = null; render(); }
+  if (await confirmar('¿Borrar este registro?', `${esc(r.emoji)} ${esc(r.taskName)}: se restarán ${r.points} puntos a ${esc(r.personName)}.`, 'Borrar', 1)) { delItem('log', id); if (ULT) { ULT = ULT.filter(x => x.id !== id); if (!ULT.length) ULT = null; } render(); }
 }
 
 /* ───── Puntos ───── */
@@ -245,28 +257,39 @@ function vPerfiles() {
     h += seccion('', `<button class="row" data-id="${esc(p.id)}" onclick="editorPersona(this.dataset.id)">${avatar(p, 60)}<span class="tx"><b class="big">${esc(p.name)}</b><small>${esc(textoAway(p.home))}</small></span><span class="edit" style="color:${c}">✎</span></button>
       <div class="row stats"><span><small>Este mes</small><b style="color:${c}">${s.puntosMes} pts</b><small>${s.tareasMes === 1 ? '1 tarea' : s.tareasMes + ' tareas'}</small></span><span><small>En total</small><b style="color:${c}">${s.puntosTotal} pts</b><small>${s.tareasTotal === 1 ? '1 tarea' : s.tareasTotal + ' tareas'}</small></span></div>
       <div class="row col"><b class="lbl">Días en casa</b><div class="days">${SEMANA.map(([d, ini, nom]) => `<button class="${draft.has(d) ? 'on' : ''}" style="--c:${c};--t:${textoSobre(c)}" data-id="${esc(p.id)}" data-d="${d}" aria-label="${nom}" onclick="toggleDia(this.dataset.id,+this.dataset.d)">${ini}</button>`).join('')}</div>
-        ${cambios ? `<div class="dsave"><small>${esc(textoAway([...draft]))}</small><button class="lnk" data-id="${esc(p.id)}" onclick="delete DIAS[this.dataset.id];render()">Descartar</button><button class="bt sm" style="background:${c};color:${textoSobre(c)}" data-id="${esc(p.id)}" onclick="guardarDias(this.dataset.id)">Guardar</button></div>` : ''}</div>
+        ${cambios ? `<small class="naranja">Sin guardar: ${esc(textoAway([...draft]).toLowerCase())}. Pulsa «Guardar» abajo.</small>` : ''}</div>
       ${rec.length ? '<div class="row"><b class="lbl">Actividad reciente</b></div>' + rec.map(r => filaHist(r, c, etiquetaDia(r.date, hoy))).join('') : '<div class="row"><small class="mu">Sin actividad todavía.</small></div>'}`);
   });
   if (ps.length) h += seccion('', `<div class="row"><span class="tx">Soy</span><select onchange="yo.set(this.value)">${persona(yo.get()) ? '' : '<option value="">Sin elegir</option>'}${ps.map(p => `<option value="${esc(p.id)}"${p.id === yo.get() ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`, 'La persona que se elige por defecto al registrar en este dispositivo.');
   h += secCard();
   h += seccion('Datos', `<button class="row" onclick="importarNativa()"><span class="emo">📥</span><span class="tx"><b>Importar desde la app nativa</b><small>Trae personas, tareas, historial y premios</small></span></button><a class="row" href="${GASTOS_URL}"><span class="emo">💶</span><span class="tx"><b>Abrir Gastos</b><small>Misma cuenta y mismo hogar</small></span></a>`);
-  return h + `<div style="margin-top:14px">${syncBadge()}</div>`;
+  return h + `<div style="margin-top:14px">${syncBadge()}</div>` + (Object.keys(DIAS).length ? '<div style="height:90px"></div>' : '');
 }
-function toggleDia(pid, d) { const p = persona(pid); if (!p) return; const s = DIAS[pid] || new Set(p.home); s.has(d) ? s.delete(d) : s.add(d); DIAS[pid] = s; render(); }
-async function guardarDias(pid) {
+function toggleDia(pid, d) {
+  const p = persona(pid); if (!p) return; const s = DIAS[pid] || new Set(p.home); s.has(d) ? s.delete(d) : s.add(d);
+  if ([...s].sort().join() === [...p.home].sort().join()) delete DIAS[pid]; else DIAS[pid] = s;
+  render();
+}
+/* Barra fija sobre las pestañas para guardar los días en casa (siempre visible, aunque la tarjeta quede abajo) */
+function barraDias(b, p) {
+  const c = colorValido(p.color);
+  b.innerHTML = `<div class="undo dias"><span><b>Días en casa de ${esc(p.name)}</b><small>${esc(textoAway([...DIAS[p.id]]))} · los registros anteriores no cambian</small></span><button class="lnk" data-id="${esc(p.id)}" onclick="delete DIAS[this.dataset.id];render()">Descartar</button><button class="bt sm" style="background:${c};color:${textoSobre(c)}" data-id="${esc(p.id)}" onclick="guardarDias(this.dataset.id)">Guardar</button></div>`;
+  b.hidden = false;
+}
+function guardarDias(pid) {
   const p = persona(pid), s = DIAS[pid]; if (!p || !s) return;
-  if (await confirmar(`¿Guardar los días en casa de ${esc(p.name)}?`, `A partir de ahora: ${esc(textoAway([...s]).toLowerCase())}. Los registros anteriores no cambian.`, 'Guardar')) { putItem('people', { id: pid, home: normalizarDias([...s]) }); delete DIAS[pid]; render(); }
+  putItem('people', { id: pid, home: normalizarDias([...s]) }); delete DIAS[pid]; render(); toast(`Días en casa de ${p.name} guardados`);
 }
 function editorPersona(id) {
   const o = id ? persona(id) : null, st = { color: o ? colorValido(o.color) : PALETA[0], photo: o ? o.photo : null };
   const w = hoja(o ? 'Editar persona' : 'Nueva persona', `
-    <div class="avedit"><span id="pav"></span><div class="bar"><label class="lnk fl">${st.photo ? 'Cambiar foto' : 'Añadir foto'}<input type="file" id="pf" accept="image/*"></label><button class="lnk rojo" id="pq" ${st.photo ? '' : 'hidden'}>Quitar foto</button></div></div>
+    <div class="avedit"><span id="pav"></span><div id="pcrop" class="cropw" hidden></div><div class="bar" id="pbar"><label class="lnk fl"><span id="pfl"></span><input type="file" id="pf" accept="image/*"></label><button class="lnk" id="pa" hidden>Ajustar</button><button class="lnk rojo" id="pq" hidden>Quitar</button></div></div>
     <div class="grp"><div class="row"><input id="pn" class="plain" placeholder="Nombre" maxlength="24" autocapitalize="words" value="${esc(o ? o.name : '')}"></div><div class="row"><input id="pe" class="plain" placeholder="Emoji (opcional)" value="${esc(o ? o.emoji : '')}"></div></div><div class="gf">Si no hay foto ni emoji, se muestra la inicial sobre su color.</div>
     <div class="gh">Color</div><div class="grp"><div class="row sw">${PALETA.map(c => `<button data-c="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div><div class="row"><span class="tx">Otro color</span><input type="color" id="pc" value="${st.color}"></div></div>
     ${o ? `<div class="grp"><button class="row rojo" id="pdel" ${S.people.length <= 1 ? 'disabled' : ''}>Eliminar a ${esc(o.name)}</button></div><div class="gf">${S.people.length <= 1 ? 'Siempre tiene que haber al menos una persona.' : 'Sus registros se conservan en el historial.'}</div>` : ''}<p class="err" id="perr"></p>`, o ? 'Guardar' : 'Añadir', () => {
     const nombre = w.querySelector('#pn').value.trim().slice(0, 24);
     if (!nombre) { w.querySelector('#perr').textContent = 'Escribe un nombre.'; return false; }
+    if (st.crop) st.photo = st.crop.recortar();
     const datos = { name: nombre, emoji: w.querySelector('#pe').value, color: st.color, photo: st.photo || null };
     if (o) putItem('people', Object.assign({ id: o.id }, datos));
     else { const p = Object.assign({ id: uid(), home: [0, 1, 2, 3, 4, 5, 6], order: Math.max(0, ...S.people.map(x => x.order || 0)) + 1 }, datos); putItem('people', p); if (!yo.get()) yo.set(p.id); }
@@ -276,24 +299,76 @@ function editorPersona(id) {
     w.querySelector('#pav').innerHTML = avatar({ name: w.querySelector('#pn').value.trim() || '?', emoji: w.querySelector('#pe').value, color: st.color, photo: st.photo }, 96);
     w.querySelectorAll('.sw [data-c]').forEach(b => b.textContent = b.dataset.c === st.color ? '✓' : '');
     w.querySelectorAll('.sw [data-c]').forEach(b => b.style.color = textoSobre(b.dataset.c));
-    w.querySelector('#pq').hidden = !st.photo;
+    w.querySelector('#pq').hidden = w.querySelector('#pa').hidden = !st.photo;
+    w.querySelector('#pfl').textContent = st.photo ? 'Cambiar foto' : 'Añadir foto';
+  };
+  const ajustar = async src => {
+    const caja = w.querySelector('#pcrop');
+    try { st.crop = await recortador(caja, src); } catch (x) { toast('No se pudo leer la imagen'); return; }
+    w.querySelector('#pav').hidden = w.querySelector('#pbar').hidden = true; caja.hidden = false;
+    const fin = foto => { if (foto !== undefined) st.photo = foto; st.crop = null; caja.hidden = true; caja.innerHTML = ''; w.querySelector('#pav').hidden = w.querySelector('#pbar').hidden = false; upd(); };
+    caja.querySelector('#cx').onclick = () => fin();
+    caja.querySelector('#cok').onclick = () => fin(st.crop.recortar());
   };
   w.querySelector('#pn').oninput = upd;
   w.querySelector('#pe').oninput = e => { e.target.value = unGrafema(e.target.value); upd(); };
   w.querySelectorAll('.sw [data-c]').forEach(b => b.onclick = () => { st.color = b.dataset.c; w.querySelector('#pc').value = st.color; upd(); });
   w.querySelector('#pc').oninput = e => { st.color = e.target.value.toUpperCase(); upd(); };
   w.querySelector('#pq').onclick = () => { st.photo = null; upd(); };
-  w.querySelector('#pf').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { st.photo = await fotoReducida(f); upd(); } catch (x) { toast('No se pudo leer la imagen'); } };
+  w.querySelector('#pf').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) ajustar(f); };
+  w.querySelector('#pa').onclick = () => { if (st.photo) ajustar(st.photo); };
   if (o) w.querySelector('#pdel').onclick = async () => { closeModal(); if (S.people.length > 1 && await confirmar(`¿Eliminar a ${esc(o.name)}?`, 'Dejará de aparecer en la app. Sus registros se conservan en el historial.', 'Eliminar', 1)) { delItem('people', o.id); render(); } };
   upd();
 }
-/* Foto reducida a 256 px en JPEG (como la app nativa) para que ocupe poco */
-function fotoReducida(file) {
+/* Carga una imagen (archivo o data URL) reducida a 1200 px como mucho, para recortarla con soltura */
+function cargarImagen(src) {
   return new Promise((res, rej) => {
-    const url = URL.createObjectURL(file), img = new Image();
-    img.onload = () => { const k = Math.min(1, 256 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.7)); };
-    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('imagen')); }; img.src = url;
+    const url = typeof src === 'string' ? src : URL.createObjectURL(src), img = new Image(), fin = () => { if (url !== src) URL.revokeObjectURL(url); };
+    img.onload = () => { const k = Math.min(1, 1200 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); fin(); res(c); };
+    img.onerror = () => { fin(); rej(new Error('imagen')); }; img.src = url;
   });
+}
+/* Recortador circular: arrastrar para mover, pellizcar (o la barra) para acercar.
+ * El resultado es un JPEG cuadrado de 256 px (como la app nativa) para que ocupe poco. */
+async function recortador(caja, src) {
+  const lienzo = await cargarImagen(src), V = 240, ZMAX = 5, w0 = lienzo.width, h0 = lienzo.height, s0 = V / Math.min(w0, h0);
+  caja.innerHTML = `<div class="crop" id="cv" style="width:${V}px;height:${V}px"><img id="ci" alt="" draggable="false"></div>
+    <input type="range" id="cz" min="1" max="${ZMAX}" step="0.01" value="1" aria-label="Zoom">
+    <small class="mu">Arrastra para mover · pellizca o usa la barra para acercar</small>
+    <div class="bar"><button class="lnk" id="cx">Cancelar</button><button class="lnk b" id="cok">Usar foto</button></div>`;
+  const vp = caja.querySelector('#cv'), im = caja.querySelector('#ci'), zr = caja.querySelector('#cz');
+  im.src = lienzo.toDataURL('image/jpeg', 0.9);
+  let z = 1, ox = 0, oy = 0;
+  const esc_ = () => s0 * z;
+  const pinta = () => {
+    const k = esc_(), W = w0 * k, H = h0 * k;
+    ox = Math.min(0, Math.max(V - W, ox)); oy = Math.min(0, Math.max(V - H, oy));
+    im.style.width = W + 'px'; im.style.height = H + 'px'; im.style.transform = `translate(${ox}px,${oy}px)`; zr.value = z;
+  };
+  const zoomEn = (nz, px, py) => { nz = Math.min(ZMAX, Math.max(1, nz)); const k = esc_(), ix = (px - ox) / k, iy = (py - oy) / k; z = nz; ox = px - ix * esc_(); oy = py - iy * esc_(); pinta(); };
+  ox = (V - w0 * s0) / 2; oy = (V - h0 * s0) / 2; pinta();
+  zr.oninput = () => zoomEn(+zr.value, V / 2, V / 2);
+  const dedos = new Map(); let prev = null;
+  const estado = () => { const p = [...dedos.values()], r = vp.getBoundingClientRect(); if (!p.length) return null; const mx = p.reduce((a, q) => a + q.x, 0) / p.length - r.left, my = p.reduce((a, q) => a + q.y, 0) / p.length - r.top; return { mx, my, d: p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0, n: p.length }; };
+  vp.addEventListener('pointerdown', e => { e.preventDefault(); try { vp.setPointerCapture(e.pointerId); } catch (x) {} dedos.set(e.pointerId, { x: e.clientX, y: e.clientY }); prev = estado(); });
+  vp.addEventListener('pointermove', e => {
+    if (!dedos.has(e.pointerId)) return; dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const a = estado(); if (!a || !prev || a.n !== prev.n) { prev = a; return; }
+    ox += a.mx - prev.mx; oy += a.my - prev.my;
+    if (a.n > 1 && prev.d > 0) zoomEn(z * a.d / prev.d, a.mx, a.my); else pinta();
+    prev = a;
+  });
+  const suelta = e => { dedos.delete(e.pointerId); prev = estado(); };
+  vp.addEventListener('pointerup', suelta); vp.addEventListener('pointercancel', suelta);
+  vp.addEventListener('wheel', e => { e.preventDefault(); const r = vp.getBoundingClientRect(); zoomEn(z * Math.exp(-e.deltaY / 300), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+  vp.addEventListener('gesturestart', e => e.preventDefault());
+  return {
+    recortar() {
+      const k = esc_(), c = document.createElement('canvas'); c.width = c.height = 256;
+      c.getContext('2d').drawImage(lienzo, -ox / k, -oy / k, V / k, V / k, 0, 0, 256, 256);
+      return c.toDataURL('image/jpeg', 0.8);
+    },
+  };
 }
 const SQL_EXPORT = "select json_build_object('people', (select coalesce(json_agg(p), '[]') from people p), 'tasks', (select coalesce(json_agg(t), '[]') from tasks t), 'log', (select coalesce(json_agg(l), '[]') from log l), 'rewards', (select coalesce(json_agg(r), '[]') from rewards r), 'claims', (select coalesce(json_agg(c), '[]') from claims c)) as datos;";
 function importarNativa() {
