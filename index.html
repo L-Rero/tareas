@@ -46,6 +46,9 @@
 window.addEventListener('error', e => { try { toast('Error: ' + (e.message || 'desconocido'), 6000); } catch (x) {} });
 boot();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  // Cuando se instala una versión nueva, la app se recarga sola una vez para usarla
+  let recargada = false;
+  if (navigator.serviceWorker.controller) navigator.serviceWorker.addEventListener('controllerchange', () => { if (!recargada) { recargada = true; location.reload(); } });
   navigator.serviceWorker.register('sw.js').then(r => {
     r.addEventListener('updatefound', () => { const w = r.installing; w && w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) toast('Hay una versión nueva. Cierra y vuelve a abrir la app para usarla.', 8000); }); });
   }).catch(() => {});
