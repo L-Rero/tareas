@@ -1,6 +1,6 @@
 /* Service worker: guarda la app para que abra sin conexión. Nunca guarda datos del usuario
  * (las llamadas a Supabase no pasan por la caché). Cambia VERSION al publicar cambios. */
-const VERSION = 'tareas-v4';
+const VERSION = 'tareas-v5';
 const ASSETS = ['./', 'index.html', 'tareas.css', 'config.js', 'manifest.webmanifest',
   'js/crypto.js', 'js/common.js', 'js/logica.js', 'js/datos.js', 'js/sync.js', 'js/vistas.js', 'js/setup.js',
   'vendor/supabase.js', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];

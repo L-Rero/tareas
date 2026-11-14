@@ -261,8 +261,8 @@ function vPerfiles() {
       ${rec.length ? '<div class="row"><b class="lbl">Actividad reciente</b></div>' + rec.map(r => filaHist(r, c, etiquetaDia(r.date, hoy))).join('') : '<div class="row"><small class="mu">Sin actividad todavía.</small></div>'}`);
   });
   if (ps.length) h += seccion('', `<div class="row"><span class="tx">Soy</span><select onchange="yo.set(this.value)">${persona(yo.get()) ? '' : '<option value="">Sin elegir</option>'}${ps.map(p => `<option value="${esc(p.id)}"${p.id === yo.get() ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`, 'La persona que se elige por defecto al registrar en este dispositivo.');
-  h += secCard();
   h += seccion('Datos', `<button class="row" onclick="importarNativa()"><span class="emo">📥</span><span class="tx"><b>Importar desde la app nativa</b><small>Trae personas, tareas, historial y premios</small></span></button><a class="row" href="${GASTOS_URL}"><span class="emo">💶</span><span class="tx"><b>Abrir Gastos</b><small>Misma cuenta y mismo hogar</small></span></a>`);
+  h += secCard();
   return h + `<div style="margin-top:14px">${syncBadge()}</div>` + (Object.keys(DIAS).length ? '<div style="height:90px"></div>' : '');
 }
 function toggleDia(pid, d) {
