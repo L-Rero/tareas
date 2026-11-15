@@ -108,7 +108,7 @@ function vRegistrar() {
   if (!dias.length) h += seccion('', '<div class="empty">Aún no hay registros.</div>');
   h += dias.map(d => seccion(esc(etiquetaDia(d.fecha, hoy)), d.registros.map(r => (EDIT_H ? `<div class="row"><button class="minus" data-id="${esc(r.id)}" onclick="borrarRegistro(this.dataset.id)" aria-label="Borrar">−</button>` + filaHist(r, (persona(r.person) || {}).color || COLOR_BORRADA).slice(17) : filaHist(r, (persona(r.person) || {}).color || COLOR_BORRADA))).join(''))).join('');
   if (todos.length > LIM_H) h += `<button class="bt g w" onclick="LIM_H+=30;render()">Mostrar más</button>`;
-  return h + '<div style="height:70px"></div>';
+  return h + '<div style="height:96px"></div>';
 }
 function listaRegistrarHtml(p, ops, away) {
   const cuerpo = ops.length ? ops.map(o => { const on = SEL.has(o.tarea.id), c = colorValido(p.color); return `<button class="row opt${on ? ' on' : ''}" style="--c:${c}" data-id="${esc(o.tarea.id)}" onclick="elegirTarea(this.dataset.id)"><span class="emo">${esc(o.tarea.emoji)}</span><span class="tx"><b>${esc(o.tarea.name)}</b><small class="${o.valor.tocaYa && !o.tarea.once ? 'naranja' : ''}">${esc(estadoOpcion(o))}</small></span>${pastilla(o.puntos, c)}<span class="chk">${on ? '✓' : ''}</span></button>`; }).join('')
@@ -119,7 +119,7 @@ function listaRegistrarHtml(p, ops, away) {
 function elegirTarea(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id); listaRegistrar(); barraInferior(); }
 function listaRegistrar() { const p = personaActual(), e = $('#lreg'); if (!p || !e) return; e.innerHTML = listaRegistrarHtml(p, opcionesRegistrar(S.tasks, S.log, p, FECHA, BUSQ), awayPct(p.home)); }
 function barraInferior() {
-  const b = $('#bbar'); if (!b) return;
+  const b = $('#bbar'); if (!b) return; ajustarBarra();
   const p = personaActual();
   if (TAB === 'registrar' && p && SEL.size) {
     const os = opcionesRegistrar(S.tasks, S.log, p, FECHA, '').filter(x => SEL.has(x.tarea.id));
@@ -136,6 +136,15 @@ function barraInferior() {
   if (TAB === 'perfiles') { const pid = Object.keys(DIAS).find(id => persona(id)); if (pid) { barraDias(b, persona(pid)); return; } }
   b.hidden = true; b.innerHTML = '';
 }
+/* Mide la barra de pestañas y el teclado para que la barra de confirmar/guardar quede siempre a la vista */
+function ajustarBarra() {
+  const r = document.documentElement, tb = $('.tabbar'), vv = window.visualViewport;
+  if (tb && tb.offsetHeight) r.style.setProperty('--tbh', tb.offsetHeight + 'px');
+  const kb = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+  r.style.setProperty('--kb', kb + 'px'); r.classList.toggle('kb', kb > 80);
+}
+window.addEventListener('resize', ajustarBarra);
+if (window.visualViewport) { visualViewport.addEventListener('resize', ajustarBarra); visualViewport.addEventListener('scroll', ajustarBarra); }
 async function confirmarRegistro() {
   const p = personaActual(), hoy = Fechas.hoy();
   const ts = opcionesRegistrar(S.tasks, S.log, p || { home: [] }, FECHA, '').map(o => o.tarea).filter(t => SEL.has(t.id) && !puntualHecha(t, S.log));
