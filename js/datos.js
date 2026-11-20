@@ -57,23 +57,3 @@ const persona = id => S.people.find(p => p.id === id) || null;
 const putItem = (k, x) => { const L = S[k], i = L.findIndex(y => y.id === x.id); if (i >= 0) L[i] = Object.assign({}, L[i], x); else L.push(x); save(); };
 const delItem = (k, id) => { S[k] = S[k].filter(y => y.id !== id); save(); };
 
-/* ───── Importar desde la app nativa (consulta SQL) o desde un archivo de exportación ───── */
-const camel = o => { if (Array.isArray(o)) return o.map(camel); if (o && typeof o === 'object') { const r = {}; Object.keys(o).forEach(k => r[k.replace(/_([a-z])/g, (_, c) => c.toUpperCase())] = camel(o[k])); return r; } return o; };
-function normalizarImport(raw) {
-  let o = typeof raw === 'string' ? JSON.parse(raw) : raw;
-  if (Array.isArray(o) && o.length === 1) o = o[0];                        // resultado del editor SQL
-  if (o && o.json_build_object) o = o.json_build_object;
-  if (o && o.datos) o = o.datos;
-  if (typeof o === 'string') o = JSON.parse(o);
-  o = camel(o);
-  if (!o || !['people', 'tasks', 'log', 'rewards', 'claims'].some(k => Array.isArray(o[k]))) throw new Error('El texto no contiene datos de Tareas de casa.');
-  const iso = t => { const d = new Date(t); return t && !isNaN(d) ? d.toISOString() : Fechas.marca(); };
-  const fecha = t => String(t || '').slice(0, 10);
-  return {
-    people: (o.people || []).map((p, i) => ({ id: String(p.id), name: String(p.name || 'Sin nombre').slice(0, 24), emoji: p.emoji || '', color: colorValido(p.color), photo: p.photo || null, home: normalizarDias((p.home || [0, 1, 2, 3, 4, 5, 6]).map(Number)), order: Number.isFinite(+p.order) ? +p.order : i + 1 })),
-    tasks: (o.tasks || []).map(t => ({ id: String(t.id), name: String(t.name || 'Tarea').slice(0, 60), emoji: t.emoji || '✅', base: Math.max(1, +t.base || 1), every: t.once ? null : Math.max(1, +t.every || 7), once: !!t.once, createdAt: fecha(t.createdAt) || Fechas.hoy() })),
-    log: (o.log || []).map(e => ({ id: String(e.id), taskId: String(e.taskId), taskName: e.taskName || '', emoji: e.emoji || '', person: String(e.person), personName: e.personName || '', date: fecha(e.date), points: +e.points || 0, base: +e.base || 0, bonusPct: +e.bonusPct || 0, awayPct: +e.awayPct || 0, every: e.every ?? null, once: !!e.once, createdAt: iso(e.createdAt) })),
-    rewards: (o.rewards || []).map(r => ({ id: String(r.id), name: String(r.name || 'Recompensa').slice(0, 60), emoji: r.emoji || '🎁', type: r.type === 'reach' ? 'reach' : 'every', period: r.period === 'total' ? 'total' : 'month', points: Math.max(1, +r.points || 100), who: (r.who || []).map(String), since: fecha(r.since) || '0000-00-00' })),
-    claims: (o.claims || []).map(c => ({ id: String(c.id), rewardId: String(c.rewardId), rewardName: c.rewardName || '', emoji: c.emoji || '🎁', person: String(c.person), personName: c.personName || '', bucket: String(c.bucket), n: +c.n || 1, threshold: +c.threshold || 0, claimedAt: iso(c.claimedAt) })),
-  };
-}

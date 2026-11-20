@@ -15,6 +15,7 @@ a{color:inherit;text-decoration:none}
 h2.sub{font-size:20px;font-weight:700;margin:22px 4px 0;display:flex;justify-content:space-between;align-items:baseline}
 .gh{font-size:13px;color:var(--mu);text-transform:uppercase;letter-spacing:.02em;margin:20px 16px 7px}
 .gh .lnk{text-transform:none}
+.gh:has(> .lnk){display:flex;justify-content:space-between;align-items:baseline}.gh > .lnk{font-size:15px}
 .gf{font-size:13px;color:var(--mu);margin:7px 16px 0;line-height:1.35}
 .grp{background:var(--sf);border-radius:12px;overflow:hidden;margin-top:0}
 .grp+.grp{margin-top:20px}
@@ -126,7 +127,6 @@ input.plain,.md.sheet input.plain{flex:1;width:auto;height:auto;padding:0;border
 .stp button+button{border-left:.5px solid var(--ln)}
 .num-in{width:90px;text-align:right}
 .chk2{color:var(--ac);font-weight:700;width:20px}
-textarea.code{width:100%;min-height:90px;font:12px ui-monospace,Menlo,monospace;background:var(--fill);border:0;border-radius:10px;padding:10px;margin:6px 0}
 /* Barra de pestañas */
 .tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));width:min(calc(100% - 24px),480px);z-index:10;display:flex;padding:5px;border-radius:99px;background:var(--hd);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);border:.5px solid var(--ln);box-shadow:0 8px 30px rgba(0,0,0,.1)}
 .tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 0 5px;border-radius:99px;font-size:10px;font-weight:600;text-align:center}
@@ -168,3 +168,10 @@ textarea.code{width:100%;min-height:90px;font:12px ui-monospace,Menlo,monospace;
 #sec .row{padding:6px 0;min-height:0;flex-wrap:wrap}#sec .row::before{display:none}
 #sec .bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 #sec p{margin:6px 0}
+
+/* Sin zoom al tocar dos veces la pantalla */
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* Filtro de habitaciones en Registrar */
+.chips.hab{margin-top:14px;padding-bottom:0}
+.chips.hab button{flex:none;background:var(--sf);border-radius:99px;padding:6px 14px;font-size:15px;white-space:nowrap;color:var(--ink)}
+.chips.hab button.on{background:var(--ac);color:#fff;font-weight:600}

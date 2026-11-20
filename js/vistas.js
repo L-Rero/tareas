@@ -1,7 +1,7 @@
 /* Interfaz de Tareas de casa: mismas pantallas que la app nativa (TareasCasa/Vistas). */
 const M = () => document.getElementById('m');
 let TAB = 'resumen', MES = Fechas.mes(Fechas.hoy()), VER_TODO = false;
-let SEL = new Set(), FECHA = '', BUSQ = '', ULT = null, ULT_T = null, EDIT_H = false, LIM_H = 30, DIAS = {};
+let SEL = new Set(), HAB_F = '', FECHA = '', BUSQ = '', ULT = null, ULT_T = null, EDIT_H = false, LIM_H = 30, DIAS = {};
 const GASTOS_URL = 'https://l-rero.github.io/gastos/';
 
 /* Conexión con las piezas compartidas (sync.js y setup.js) */
@@ -111,10 +111,20 @@ function vRegistrar() {
   return h + '<div style="height:96px"></div>';
 }
 function listaRegistrarHtml(p, ops, away) {
-  const cuerpo = ops.length ? ops.map(o => { const on = SEL.has(o.tarea.id), c = colorValido(p.color); return `<button class="row opt${on ? ' on' : ''}" style="--c:${c}" data-id="${esc(o.tarea.id)}" onclick="elegirTarea(this.dataset.id)"><span class="emo">${esc(o.tarea.emoji)}</span><span class="tx"><b>${esc(o.tarea.name)}</b><small class="${o.valor.tocaYa && !o.tarea.once ? 'naranja' : ''}">${esc(estadoOpcion(o))}</small></span>${pastilla(o.puntos, c)}<span class="chk">${on ? '✓' : ''}</span></button>`; }).join('')
-    : `<div class="empty">${BUSQ ? 'Sin resultados para «' + esc(BUSQ) + '».' : 'No hay tareas pendientes.'}</div>`;
-  const pie = [ops.length ? 'Puedes marcar varias tareas a la vez.' : '', away > 0 ? `Incluye +${away} % por días fuera de casa.` : ''].filter(Boolean).join(' ');
-  return seccion('Tareas para ' + esc(p.name), cuerpo, pie);
+  const habs = habitaciones(S.tasks);
+  if (HAB_F && HAB_F !== '-' && !habs.includes(HAB_F)) HAB_F = '';
+  const vis = HAB_F ? ops.filter(o => habDe(o.tarea) === (HAB_F === '-' ? '' : HAB_F)) : ops;
+  const c = colorValido(p.color);
+  const fila = o => { const on = SEL.has(o.tarea.id); return `<button class="row opt${on ? ' on' : ''}" style="--c:${c}" data-id="${esc(o.tarea.id)}" onclick="elegirTarea(this.dataset.id)"><span class="emo">${esc(o.tarea.emoji)}</span><span class="tx"><b>${esc(o.tarea.name)}</b><small class="${o.valor.tocaYa && !o.tarea.once ? 'naranja' : ''}">${esc(estadoOpcion(o))}</small></span>${pastilla(o.puntos, c)}<span class="chk">${on ? '✓' : ''}</span></button>`; };
+  const pie = [vis.length ? 'Puedes marcar varias tareas a la vez.' : '', away > 0 ? `Incluye +${away} % por días fuera de casa.` : ''].filter(Boolean).join(' ');
+  const vacio = `<div class="empty">${BUSQ ? 'Sin resultados para «' + esc(BUSQ) + '».' : 'No hay tareas pendientes.'}</div>`;
+  if (!habs.length) return seccion('Tareas para ' + esc(p.name), vis.length ? vis.map(fila).join('') : vacio, pie);
+  // Filtro por habitación y una sección por cada habitación
+  const hayS = S.tasks.some(t => !habDe(t)), chip = (v, txt) => `<button class="${HAB_F === v ? 'on' : ''}" data-h="${esc(v)}" onclick="HAB_F=this.dataset.h;listaRegistrar()">${esc(txt)}</button>`;
+  let h = `<div class="chips hab">${chip('', 'Todas')}${habs.map(x => chip(x, x)).join('')}${hayS ? chip('-', SIN_HAB) : ''}</div>`;
+  if (!vis.length) return h + seccion('Tareas para ' + esc(p.name), vacio, pie);
+  const g = agruparPorHabitacion(vis, o => o.tarea);
+  return h + g.map((x, i) => seccion(esc(x.hab || SIN_HAB), x.items.map(fila).join(''), i === g.length - 1 ? pie : '')).join('');
 }
 function elegirTarea(id) { SEL.has(id) ? SEL.delete(id) : SEL.add(id); listaRegistrar(); barraInferior(); }
 function listaRegistrar() { const p = personaActual(), e = $('#lreg'); if (!p || !e) return; e.innerHTML = listaRegistrarHtml(p, opcionesRegistrar(S.tasks, S.log, p, FECHA, BUSQ), awayPct(p.home)); }
@@ -166,23 +176,36 @@ async function borrarRegistro(id) {
 function vPuntos() {
   const hoy = Fechas.hoy(), filas = filasPuntos(S.tasks, S.log, hoy), hechas = puntualesHechas(S.tasks, S.log);
   let h = `<div class="chips">${REGLAS.map(r => `<span>${esc(r)}</span>`).join('')}</div>`;
-  h += seccion('Valor de hoy', filas.length ? filas.map(f => `<button class="row" data-id="${esc(f.tarea.id)}" onclick="editorTarea(this.dataset.id)"><span class="emo">${esc(f.tarea.emoji)}</span><span class="tx"><b>${esc(f.tarea.name)}</b><small>${etiqueta(estadoFila(f))} ${esc(detalleFila(f))}</small></span><span class="num${f.valor.bonusPct > 0 ? ' rojo' : ''}">${f.valor.points}</span></button>`).join('') : '<div class="empty">No hay tareas. Pulsa + para crear una.</div>',
-    'Toca una tarea para editarla. Los puntos no incluyen el extra por días fuera de casa.');
+  const fila = f => `<button class="row" data-id="${esc(f.tarea.id)}" onclick="editorTarea(this.dataset.id)"><span class="emo">${esc(f.tarea.emoji)}</span><span class="tx"><b>${esc(f.tarea.name)}</b><small>${etiqueta(estadoFila(f))} ${esc(detalleFila(f))}</small></span><span class="num${f.valor.bonusPct > 0 ? ' rojo' : ''}">${f.valor.points}</span></button>`;
+  const pie = 'Toca una tarea para editarla o cambiarla de habitación. Los puntos no incluyen el extra por días fuera de casa.';
+  if (!filas.length || !habitaciones(S.tasks).length) h += seccion('Valor de hoy', filas.length ? filas.map(fila).join('') : '<div class="empty">No hay tareas. Pulsa + para crear una.</div>', pie);
+  else {
+    const g = agruparPorHabitacion(filas, f => f.tarea);
+    h += '<h2 class="sub">Valor de hoy</h2>' + g.map((x, i) => seccion(esc(x.hab || SIN_HAB) + ` · ${x.items.length}`, x.items.map(fila).join(''), i === g.length - 1 ? pie : '',
+      x.hab ? `<button class="lnk" data-h="${esc(x.hab)}" onclick="editorHabitacion(this.dataset.h)">Editar</button>` : '')).join('');
+  }
   if (hechas.length) h += seccion('Puntuales hechas', hechas.map(x => `<button class="row" data-id="${esc(x.tarea.id)}" onclick="editorTarea(this.dataset.id)"><span class="emo">${esc(x.tarea.emoji)}</span><span class="tx"><b>${esc(x.tarea.name)}</b><small>${esc(x.registro.personName)} · ${esc(etiquetaDia(x.registro.date, hoy))}</small></span><span class="ok">✓</span></button>`).join(''));
   return h;
 }
 function editorTarea(id) {
   const o = id ? S.tasks.find(t => t.id === id) : null;
   const st = { once: o ? !!o.once : false, every: o ? (o.every || 7) : 7, base: o ? o.base : 10 };
+  const habs = habitaciones(S.tasks), habO = habDe(o);
   const w = hoja(o ? 'Editar tarea' : 'Nueva tarea', `
     <div class="grp"><div class="row"><input id="te" class="emoji" placeholder="🧹" value="${esc(o ? o.emoji : '')}"><input id="tn" class="plain" placeholder="Nombre de la tarea" maxlength="60" value="${esc(o ? o.name : '')}"></div></div><div class="gf" id="tc"></div>
+    <div class="grp"><div class="row"><span class="tx">Habitación</span><select id="th"><option value="">${SIN_HAB}</option>${habs.map(x => `<option value="${esc(x)}"${x === habO ? ' selected' : ''}>${esc(x)}</option>`).join('')}<option value="" data-nueva="1">＋ Nueva habitación…</option></select></div>
+      <div class="row" id="thnr" hidden><input id="thn" class="plain" placeholder="Nombre (p. ej. Cocina)" maxlength="30"></div></div>
     <div class="seg"><button id="tr">Recurrente</button><button id="tp">Puntual</button></div>
     <div class="grp" id="tev"><div class="row"><span class="tx">Cada cuánto</span><b id="tevl"></b>${stepper('tevs')}</div></div><div class="gf" id="tef"></div>
-    <div class="grp"><div class="row"><span class="tx">Puntos base</span><b id="tbl"></b>${stepper('tbs')}</div></div><div class="gf">Cada persona gana además un 5 % extra por cada día que no está en casa.</div>
+    <div class="grp"><div class="row"><span class="tx">Puntos base</span><b id="tbl"></b>${stepper('tbs')}</div></div><div class="gf">Cada persona gana además un 10 % extra por cada día que no está en casa.</div>
     ${o ? `<div class="grp"><button class="row rojo" id="tdel">Eliminar tarea</button></div><div class="gf">El historial de esta tarea se conserva.</div>` : ''}<p class="err" id="terr"></p>`, 'Guardar', async () => {
     const nombre = w.querySelector('#tn').value.trim(), err = validarTarea(nombre, st.base, st.every, st.once);
     if (err) { w.querySelector('#terr').textContent = err; return false; }
-    putItem('tasks', { id: o ? o.id : uid(), name: nombre, emoji: w.querySelector('#te').value || '✅', base: st.base, every: st.once ? null : st.every, once: st.once, createdAt: o ? o.createdAt : Fechas.hoy() });
+    const nueva = !!w.querySelector('#th').selectedOptions[0].dataset.nueva, hab = nueva ? w.querySelector('#thn').value.trim() : w.querySelector('#th').value;
+    if (nueva) { const e2 = validarHabitacion(hab); if (e2) { w.querySelector('#terr').textContent = e2; return false; } }
+    // Si ya existe una habitación con el mismo nombre (sin contar mayúsculas), se usa esa
+    const room = habs.find(x => cmpNombre(x, hab) === 0) || hab;
+    putItem('tasks', { id: o ? o.id : uid(), name: nombre, emoji: w.querySelector('#te').value || '✅', room, base: st.base, every: st.once ? null : st.every, once: st.once, createdAt: o ? o.createdAt : Fechas.hoy() });
     render();
   });
   const upd = () => {
@@ -195,8 +218,22 @@ function editorTarea(id) {
   bindStepper(w, 'tevs', d => { st.every = Math.min(365, Math.max(1, st.every + d)); upd(); });
   bindStepper(w, 'tbs', d => { st.base = Math.min(500, Math.max(1, st.base + d)); upd(); });
   w.querySelector('#tn').oninput = upd; w.querySelector('#te').oninput = e => { e.target.value = unGrafema(e.target.value); };
+  w.querySelector('#th').onchange = e => { const n = !!e.target.selectedOptions[0].dataset.nueva; w.querySelector('#thnr').hidden = !n; if (n) w.querySelector('#thn').focus(); };
   if (o) w.querySelector('#tdel').onclick = async () => { closeModal(); if (await confirmar(`¿Eliminar «${esc(o.name)}»?`, 'Dejará de aparecer para registrar. Los registros que ya tiene se conservan.', 'Eliminar', 1)) { delItem('tasks', o.id); render(); } };
   upd();
+}
+/* Cambiar el nombre de una habitación o quitarla (sus tareas pasan a «Sin habitación») */
+function editorHabitacion(hab) {
+  const n = S.tasks.filter(t => habDe(t) === hab).length;
+  const w = hoja('Editar habitación', `
+    <div class="grp"><div class="row"><input id="hn" class="plain" placeholder="Nombre de la habitación" maxlength="30" value="${esc(hab)}"></div></div><div class="gf">${n === 1 ? '1 tarea' : n + ' tareas'} en esta habitación. Para mover una tarea a otra habitación, tócala en la lista.</div>
+    <div class="grp"><button class="row rojo" id="hdel">Quitar habitación</button></div><div class="gf">Las tareas no se borran: pasan a «${SIN_HAB}».</div><p class="err" id="herr"></p>`, 'Guardar', () => {
+    const nuevo = w.querySelector('#hn').value.trim(), err = validarHabitacion(nuevo);
+    if (err) { w.querySelector('#herr').textContent = err; return false; }
+    const destino = habitaciones(S.tasks).find(x => x !== hab && cmpNombre(x, nuevo) === 0) || nuevo;
+    S.tasks.forEach(t => { if (habDe(t) === hab) t.room = destino; }); save(); render();
+  });
+  w.querySelector('#hdel').onclick = async () => { closeModal(); if (await confirmar(`¿Quitar «${esc(hab)}»?`, `Sus ${n === 1 ? 'tarea pasa' : n + ' tareas pasan'} a «${SIN_HAB}». No se borra ninguna tarea.`, 'Quitar', 1)) { S.tasks.forEach(t => { if (habDe(t) === hab) t.room = ''; }); save(); render(); } };
 }
 const stepper = id => `<span class="stp" id="${id}"><button data-d="-1" aria-label="Menos">−</button><button data-d="1" aria-label="Más">+</button></span>`;
 const bindStepper = (w, id, fn, paso) => w.querySelectorAll('#' + id + ' button').forEach(b => b.onclick = () => fn(+b.dataset.d * (paso || 1)));
@@ -270,7 +307,7 @@ function vPerfiles() {
       ${rec.length ? '<div class="row"><b class="lbl">Actividad reciente</b></div>' + rec.map(r => filaHist(r, c, etiquetaDia(r.date, hoy))).join('') : '<div class="row"><small class="mu">Sin actividad todavía.</small></div>'}`);
   });
   if (ps.length) h += seccion('', `<div class="row"><span class="tx">Soy</span><select onchange="yo.set(this.value)">${persona(yo.get()) ? '' : '<option value="">Sin elegir</option>'}${ps.map(p => `<option value="${esc(p.id)}"${p.id === yo.get() ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`, 'La persona que se elige por defecto al registrar en este dispositivo.');
-  h += seccion('Datos', `<button class="row" onclick="importarNativa()"><span class="emo">📥</span><span class="tx"><b>Importar desde la app nativa</b><small>Trae personas, tareas, historial y premios</small></span></button><a class="row" href="${GASTOS_URL}"><span class="emo">💶</span><span class="tx"><b>Abrir Gastos</b><small>Misma cuenta y mismo hogar</small></span></a>`);
+  h += seccion('Datos', `<a class="row" href="${GASTOS_URL}"><span class="emo">💶</span><span class="tx"><b>Abrir Gastos</b><small>Misma cuenta y mismo hogar</small></span></a>`);
   h += secCard();
   return h + `<div style="margin-top:14px">${syncBadge()}</div>` + (Object.keys(DIAS).length ? '<div style="height:90px"></div>' : '');
 }
@@ -377,24 +414,5 @@ async function recortador(caja, src) {
       c.getContext('2d').drawImage(lienzo, -ox / k, -oy / k, V / k, V / k, 0, 0, 256, 256);
       return c.toDataURL('image/jpeg', 0.8);
     },
-  };
-}
-const SQL_EXPORT = "select json_build_object('people', (select coalesce(json_agg(p), '[]') from people p), 'tasks', (select coalesce(json_agg(t), '[]') from tasks t), 'log', (select coalesce(json_agg(l), '[]') from log l), 'rewards', (select coalesce(json_agg(r), '[]') from rewards r), 'claims', (select coalesce(json_agg(c), '[]') from claims c)) as datos;";
-function importarNativa() {
-  const w = modal(`<h3>Importar desde la app nativa</h3><p class="st">1. En supabase.com abre el proyecto de la app nativa → <b>SQL Editor</b> → pega esta consulta y pulsa <b>Run</b>:</p><textarea readonly class="code" id="sq">${esc(SQL_EXPORT)}</textarea><button class="bt g sm" id="cp">Copiar consulta</button>
-    <p class="st">2. Pulsa sobre el resultado, cópialo y pégalo aquí (o elige un archivo .json):</p><textarea id="ij" class="code" placeholder="Pega aquí el resultado"></textarea><label class="bt g sm fl">Elegir archivo<input type="file" accept=".json,application/json,text/plain" id="ifl"></label><p class="err" id="ierr"></p>
-    <div class="bar" style="justify-content:flex-end"><button class="bt g" id="ic">Cancelar</button><button class="bt" id="io">Importar</button></div>`);
-  w.querySelector('#cp').onclick = async () => { try { await navigator.clipboard.writeText(SQL_EXPORT); toast('Consulta copiada'); } catch (e) { w.querySelector('#sq').select(); } };
-  w.querySelector('#ifl').onchange = async e => { const f = e.target.files[0]; if (f) w.querySelector('#ij').value = await f.text(); };
-  w.querySelector('#ic').onclick = closeModal;
-  w.querySelector('#io').onclick = async () => {
-    let d; try { d = normalizarImport(w.querySelector('#ij').value.trim()); } catch (e) { w.querySelector('#ierr').textContent = 'No se ha podido leer: ' + (e.message || 'formato no válido'); return; }
-    closeModal();
-    const how = await askChoice('Importar datos', `Se han encontrado ${d.people.length} personas, ${d.tasks.length} tareas, ${d.log.length} registros, ${d.rewards.length} recompensas y ${d.claims.length} reclamadas.`, [{ label: 'Cancelar', cls: 'g', v: null }, { label: 'Unir con lo actual', cls: 't', v: 'merge' }, { label: 'Reemplazar lo actual', cls: 'd', v: 'replace' }]);
-    if (!how) return;
-    const now = Date.now(); ['people', 'tasks', 'log', 'rewards', 'claims'].forEach(k => d[k].forEach(x => x.u = now));
-    if (how === 'replace') { S = Object.assign(blank(), d, { del: Object.assign({}, S.del), seeded: 1 }); }
-    else { S = merge(S, Object.assign(blank(), d, { seeded: 1 })); }
-    save(); render(); toast('Datos importados');
   };
 }

@@ -33,7 +33,7 @@ function valorTarea(t, fecha, log) {
   return { points: ceilDiv(t.base * (100 + bonusPct), 100), bonusPct, elapsed, overdue, cycles, tocaYa: elapsed >= every,
     subeEn: elapsed < every ? every + 1 - elapsed : cycles * r.periodo + 1 - overdue };
 }
-const awayPct = home => 5 * (7 - new Set((home || []).filter(d => d >= 0 && d <= 6)).size);
+const awayPct = home => 10 * (7 - new Set((home || []).filter(d => d >= 0 && d <= 6)).size);
 const totalPuntos = (base, bonusPct, away) => ceilDiv(base * (100 + bonusPct) * (100 + away), 10000);
 function nuevoRegistro(t, p, fecha, log) {
   const v = valorTarea(t, fecha, log), away = awayPct(p.home);
@@ -64,13 +64,29 @@ function puntualesHechas(tasks, log) {
 function textoRegla(every) {
   return { 1: 'Si se retrasa, +2 % por cada día de retraso.', 2: 'Si se retrasa, +5 % cada 2 días.', 7: 'Si se retrasa, +20 % cada semana.', 15: 'Si se retrasa, +50 % cada 15 días.' }[reglaBonus(every).periodo] || 'Si se retrasa, +120 % cada mes.';
 }
-const REGLAS = ['📅 Cada día: +2 % por día de retraso', '2–4 días: +5 % cada 2 días', '5–10 días: +20 % cada semana', '11–22 días: +50 % cada 15 días', '23 días o más: +120 % cada mes', '🧳 +5 % por cada día fuera de casa', '⭐ Puntuales: siempre su base', '⬆️ Se redondea hacia arriba'];
+const REGLAS = ['📅 Cada día: +2 % por día de retraso', '2–4 días: +5 % cada 2 días', '5–10 días: +20 % cada semana', '11–22 días: +50 % cada 15 días', '23 días o más: +120 % cada mes', '🧳 +10 % por cada día fuera de casa', '⭐ Puntuales: siempre su base', '⬆️ Se redondea hacia arriba'];
 function validarTarea(nombre, base, every, once) {
   const n = String(nombre).trim();
   if (!n) return 'Escribe un nombre.';
   if ([...n].length > 60) return 'El nombre puede tener como mucho 60 caracteres.';
   if (!(base > 0)) return 'Los puntos base tienen que ser más de 0.';
   if (!once && !(every > 0)) return 'Indica cada cuántos días toca.';
+  return null;
+}
+
+/* ───── Habitaciones: cada tarea puede llevar «room» (el nombre de su habitación) ───── */
+const SIN_HAB = 'Sin habitación';
+const habDe = t => String((t && t.room) || '').trim();
+const habitaciones = tasks => [...new Set(tasks.map(habDe).filter(Boolean))].sort(cmpNombre);
+/* Agrupa en el orden de las habitaciones (alfabético) y deja «Sin habitación» al final; dentro de cada grupo se respeta el orden recibido. */
+function agruparPorHabitacion(items, tareaDe) {
+  const m = new Map(); items.forEach(x => { const h = habDe(tareaDe(x)); if (!m.has(h)) m.set(h, []); m.get(h).push(x); });
+  return [...m.keys()].sort((a, b) => !a ? 1 : !b ? -1 : cmpNombre(a, b)).map(h => ({ hab: h, items: m.get(h) }));
+}
+function validarHabitacion(nombre) {
+  const n = String(nombre).trim();
+  if (!n) return 'Escribe el nombre de la habitación.';
+  if ([...n].length > 30) return 'El nombre de la habitación puede tener como mucho 30 caracteres.';
   return null;
 }
 
@@ -160,7 +176,7 @@ function validarPremio(nombre, puntos) {
 const SEMANA = [[1, 'L', 'lunes'], [2, 'M', 'martes'], [3, 'X', 'miércoles'], [4, 'J', 'jueves'], [5, 'V', 'viernes'], [6, 'S', 'sábado'], [0, 'D', 'domingo']];
 function estadisticas(pid, log, mes) { const s = log.filter(e => e.person === pid), m = s.filter(e => Fechas.mes(e.date) === mes); const sum = l => l.reduce((a, e) => a + e.points, 0); return { puntosMes: sum(m), tareasMes: m.length, puntosTotal: sum(s), tareasTotal: s.length }; }
 const actividadReciente = (pid, log, n = 3) => historial(log.filter(e => e.person === pid)).slice(0, n);
-function textoAway(home) { const pct = awayPct(home), f = pct / 5; return f === 0 ? 'En casa todos los días' : f === 1 ? '+5 % por 1 día fuera de casa' : `+${pct} % por ${f} días fuera de casa`; }
+function textoAway(home) { const pct = awayPct(home), f = pct / 10; return f === 0 ? 'En casa todos los días' : f === 1 ? '+10 % por 1 día fuera de casa' : `+${pct} % por ${f} días fuera de casa`; }
 const normalizarDias = d => [...new Set(d)].filter(x => x >= 0 && x <= 6).sort((a, b) => a - b);
 
 /* ───── Colores ───── */

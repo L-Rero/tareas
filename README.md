@@ -11,9 +11,6 @@ Publicada en https://l-rero.github.io/tareas/
 ## Instalar en el iPhone
 Abre la dirección en **Safari** y pulsa **Compartir → Añadir a pantalla de inicio**. Después elige **Entrar en un hogar que ya existe**, inicia sesión con tu cuenta de Gastos, elige el hogar y escribe la contraseña del hogar.
 
-## Traer los datos de la app nativa
-En **Perfiles → Importar desde la app nativa** está la consulta SQL. Hay que ejecutarla en el *SQL Editor* del proyecto de Supabase de la app nativa y pegar el resultado en la app.
-
 ## Reglas de puntos
 | Cada cuántos días | Bonus por retraso |
 |---|---|
@@ -24,7 +21,7 @@ En **Perfiles → Importar desde la app nativa** está la consulta SQL. Hay que 
 | 23 o más | +120 % cada mes |
 
 - **Puntuales:** siempre valen su base.
-- **Extra por días fuera de casa:** +5 % por cada día fuera.
+- **Extra por días fuera de casa:** +10 % por cada día fuera.
 - **Total al registrar:** `ceil(base × (100 + bonus) × (100 + fuera) / 10000)`.
 
 ## Código compartido con Gastos
